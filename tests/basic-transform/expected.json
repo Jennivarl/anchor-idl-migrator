@@ -1,0 +1,168 @@
+{
+  "address": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo",
+  "metadata": {
+    "name": "my_program",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": ""
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "my_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "data_value",
+          "type": "u64"
+        },
+        {
+          "name": "owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "ref_type",
+          "type": {
+            "defined": {
+              "name": "MyType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "add_liquidity",
+      "discriminator": [
+        181,
+        157,
+        89,
+        67,
+        143,
+        182,
+        52,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "MyAccount",
+      "discriminator": [
+        246,
+        28,
+        6,
+        87,
+        251,
+        45,
+        50,
+        42
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "MyEvent",
+      "discriminator": [
+        96,
+        184,
+        197,
+        243,
+        139,
+        2,
+        90,
+        148
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidInput",
+      "msg": "Input is invalid"
+    }
+  ],
+  "types": [
+    {
+      "name": "MyType",
+      "serialization": "borsh",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MyAccount",
+      "serialization": "borsh",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "data_value",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MyEvent",
+      "serialization": "borsh",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "MAX_SIZE",
+      "type": "u32",
+      "value": "1000"
+    }
+  ]
+}

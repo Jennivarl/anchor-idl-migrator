@@ -1,0 +1,114 @@
+{
+    "version": "0.1.0",
+    "name": "my_program",
+    "instructions": [
+        {
+            "name": "initialize",
+            "accounts": [
+                {
+                    "name": "myAccount",
+                    "isMut": true,
+                    "isSigner": false
+                },
+                {
+                    "name": "payer",
+                    "isMut": true,
+                    "isSigner": true
+                }
+            ],
+            "args": [
+                {
+                    "name": "dataValue",
+                    "type": "u64"
+                },
+                {
+                    "name": "owner",
+                    "type": "publicKey"
+                },
+                {
+                    "name": "refType",
+                    "type": {
+                        "defined": "MyType"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "addLiquidity",
+            "accounts": [
+                {
+                    "name": "pool",
+                    "isMut": true,
+                    "isSigner": false
+                }
+            ],
+            "args": []
+        }
+    ],
+    "accounts": [
+        {
+            "name": "MyAccount",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "dataValue",
+                        "type": "u64"
+                    },
+                    {
+                        "name": "bump",
+                        "type": "u8"
+                    }
+                ]
+            }
+        }
+    ],
+    "events": [
+        {
+            "name": "MyEvent",
+            "fields": [
+                {
+                    "name": "user",
+                    "type": "publicKey",
+                    "index": false
+                },
+                {
+                    "name": "amount",
+                    "type": "u64",
+                    "index": false
+                }
+            ]
+        }
+    ],
+    "types": [
+        {
+            "name": "MyType",
+            "type": {
+                "kind": "struct",
+                "fields": [
+                    {
+                        "name": "value",
+                        "type": "u32"
+                    }
+                ]
+            }
+        }
+    ],
+    "errors": [
+        {
+            "code": 6000,
+            "name": "InvalidInput",
+            "msg": "Input is invalid"
+        }
+    ],
+    "constants": [
+        {
+            "name": "MAX_SIZE",
+            "type": "u32",
+            "value": "1000"
+        }
+    ],
+    "metadata": {
+        "address": "So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo"
+    }
+}

@@ -1,0 +1,29 @@
+schema_version: "1.0"
+
+name: "anchor-idl-v0-to-v1"
+version: "0.1.1"
+description: "Migrate Anchor IDL JSON files from v0 format (pre-Anchor 0.30) to v1 format. Handles discriminators, snake_case names, type renames, account/event struct extraction, PDA seed coercion, and all 12 documented transform rules."
+author: "Jennivarl"
+license: "MIT"
+workflow: "workflow.yaml"
+category: "migration"
+
+targets:
+  languages: ["json"]
+
+keywords:
+  - "anchor"
+  - "solana"
+  - "idl"
+  - "anchor-idl"
+  - "migration"
+  - "v0-to-v1"
+  - "discriminator"
+  - "borsh"
+
+registry:
+  access: "public"
+  visibility: "public"
+
+capabilities:
+  - "fs"

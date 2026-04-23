@@ -1,0 +1,20 @@
+{
+    "name": "anchor-idl-migrator",
+    "version": "1.0.0",
+    "description": "Migrate Anchor IDL files from legacy v0 format (pre-0.30) to v1 format",
+    "type": "module",
+    "bin": {
+        "anchor-idl-migrate": "./migrate.mjs"
+    },
+    "scripts": {
+        "test": "node test.mjs"
+    },
+    "keywords": [
+        "anchor",
+        "solana",
+        "idl",
+        "codemod",
+        "migration"
+    ],
+    "license": "MIT"
+}

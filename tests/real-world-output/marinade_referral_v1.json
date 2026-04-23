@@ -1,0 +1,863 @@
+{
+  "address": "11111111111111111111111111111111",
+  "metadata": {
+    "name": "marinade_referral",
+    "version": "0.2.0",
+    "spec": "0.1.0",
+    "description": ""
+  },
+  "instructions": [
+    {
+      "name": "deposit",
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_mint",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "liq_pool_sol_leg_pda",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "liq_pool_msol_leg",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "liq_pool_msol_leg_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "reserve_pda",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "transfer_from",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint_to",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_mint_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "marinade_finance_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_token_partner_account",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ],
+      "docs": [
+        "deposit SOL"
+      ]
+    },
+    {
+      "name": "deposit_stake_account",
+      "discriminator": [
+        110,
+        130,
+        115,
+        41,
+        164,
+        102,
+        2,
+        59
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "validator_list",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "stake_list",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "stake_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "stake_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "duplication_flag",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "rent_payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "msol_mint",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "mint_to",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_mint_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "clock",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "rent",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "stake_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "marinade_finance_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_token_partner_account",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_index",
+          "type": "u32"
+        }
+      ],
+      "docs": [
+        "deposit stake account"
+      ]
+    },
+    {
+      "name": "liquid_unstake",
+      "discriminator": [
+        30,
+        30,
+        119,
+        240,
+        191,
+        227,
+        12,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_mint",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "liq_pool_sol_leg_pda",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "liq_pool_msol_leg",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "treasury_msol_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "get_msol_from",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "get_msol_from_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "transfer_sol_to",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "marinade_finance_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_token_partner_account",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "msol_amount",
+          "type": "u64"
+        }
+      ],
+      "docs": [
+        "liquid-unstake mSOL"
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "admin_account",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "global_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "msol_mint_account",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "foreman1",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "foreman2",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "min_keep_pct",
+          "type": "u8"
+        },
+        {
+          "name": "max_keep_pct",
+          "type": "u8"
+        }
+      ],
+      "docs": [
+        "Admin",
+        "create global state"
+      ]
+    },
+    {
+      "name": "init_referral_account",
+      "discriminator": [
+        113,
+        173,
+        228,
+        216,
+        175,
+        224,
+        23,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "signer",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "partner_account",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "msol_token_partner_account",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "partner_name",
+          "type": "string"
+        },
+        {
+          "name": "validator_vote_key",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "keep_self_stake_pct",
+          "type": "u8"
+        }
+      ],
+      "docs": [
+        "create referral state"
+      ]
+    },
+    {
+      "name": "update_referral",
+      "discriminator": [
+        123,
+        215,
+        252,
+        27,
+        184,
+        244,
+        151,
+        197
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "admin_account",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "new_partner_account",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "new_msol_token_partner_account",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "pause",
+          "type": "bool"
+        }
+      ],
+      "docs": [
+        "update referral state"
+      ]
+    },
+    {
+      "name": "update_operation_fees",
+      "discriminator": [
+        229,
+        36,
+        92,
+        199,
+        165,
+        230,
+        7,
+        68
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "signer",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "operation_deposit_sol_fee",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "operation_deposit_stake_account_fee",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "operation_liquid_unstake_fee",
+          "type": {
+            "option": "u8"
+          }
+        },
+        {
+          "name": "operation_delayed_unstake_fee",
+          "type": {
+            "option": "u8"
+          }
+        }
+      ],
+      "docs": [
+        "update referral operation fees"
+      ]
+    },
+    {
+      "name": "change_authority",
+      "discriminator": [
+        50,
+        106,
+        66,
+        104,
+        99,
+        118,
+        145,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "global_state",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "admin_account",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "new_admin_account",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "new_foreman1",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "new_foreman2",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "update partner, authority and beneficiary account based on the new partner"
+      ]
+    },
+    {
+      "name": "admin_recognize_deposit",
+      "discriminator": [
+        114,
+        31,
+        225,
+        142,
+        124,
+        126,
+        182,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "global_state",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "referral_state",
+          "writable": true,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ],
+      "docs": [
+        "deposit SOL"
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GlobalState",
+      "discriminator": [
+        163,
+        46,
+        74,
+        168,
+        216,
+        123,
+        133,
+        98
+      ]
+    },
+    {
+      "name": "ReferralState",
+      "discriminator": [
+        172,
+        61,
+        132,
+        107,
+        85,
+        145,
+        97,
+        166
+      ]
+    }
+  ],
+  "events": [],
+  "errors": [],
+  "types": [
+    {
+      "name": "ReferralError",
+      "serialization": "borsh",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AccessDenied"
+          },
+          {
+            "name": "Paused"
+          },
+          {
+            "name": "TransferNotAvailable"
+          },
+          {
+            "name": "InvalidPartnerAccountOwner"
+          },
+          {
+            "name": "InvalidPartnerAccountMint"
+          },
+          {
+            "name": "PartnerNameTooLong"
+          },
+          {
+            "name": "NotInitializedMintAccount"
+          },
+          {
+            "name": "ReferralOperationFeeOverMax"
+          },
+          {
+            "name": "NotAllowedForStakeAsCollateralPartner"
+          },
+          {
+            "name": "KeepPctOutOfRange"
+          },
+          {
+            "name": "MaxKeepPctOutOfRange"
+          },
+          {
+            "name": "MinMaxKeepPctOutOfRange"
+          },
+          {
+            "name": "StakeAccountMustBeDelegatedToPartnerValidator"
+          },
+          {
+            "name": "StakeAccountAuthMustBePartnerAccount"
+          },
+          {
+            "name": "OnlyAllowedForStakeAsCollateralPartner"
+          },
+          {
+            "name": "InvalidGlobalAccount"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GlobalState",
+      "serialization": "borsh",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "msol_mint_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "foreman1",
+            "type": "pubkey"
+          },
+          {
+            "name": "foreman2",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_keep_pct",
+            "type": "u8"
+          },
+          {
+            "name": "max_keep_pct",
+            "type": "u8"
+          }
+        ]
+      },
+      "docs": [
+        "marinade-referral-program PDA"
+      ]
+    },
+    {
+      "name": "ReferralState",
+      "serialization": "borsh",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "partner_name",
+            "type": "string"
+          },
+          {
+            "name": "validator_vote_key",
+            "type": {
+              "option": "pubkey"
+            },
+            "docs": [
+              "set value if this referral-account is a stake-account-as-collateral partner record"
+            ]
+          },
+          {
+            "name": "keep_self_stake_pct",
+            "type": "u8"
+          },
+          {
+            "name": "partner_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "msol_token_partner_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "deposit_sol_amount",
+            "type": "u64"
+          },
+          {
+            "name": "deposit_sol_operations",
+            "type": "u64"
+          },
+          {
+            "name": "deposit_stake_account_amount",
+            "type": "u64"
+          },
+          {
+            "name": "deposit_stake_account_operations",
+            "type": "u64"
+          },
+          {
+            "name": "liq_unstake_msol_fees",
+            "type": "u64"
+          },
+          {
+            "name": "liq_unstake_sol_amount",
+            "type": "u64"
+          },
+          {
+            "name": "liq_unstake_msol_amount",
+            "type": "u64"
+          },
+          {
+            "name": "liq_unstake_operations",
+            "type": "u64"
+          },
+          {
+            "name": "delayed_unstake_amount",
+            "type": "u64"
+          },
+          {
+            "name": "delayed_unstake_operations",
+            "type": "u64"
+          },
+          {
+            "name": "base_fee",
+            "type": "u32"
+          },
+          {
+            "name": "max_fee",
+            "type": "u32"
+          },
+          {
+            "name": "max_net_stake",
+            "type": "u64"
+          },
+          {
+            "name": "pause",
+            "type": "bool"
+          },
+          {
+            "name": "operation_deposit_sol_fee",
+            "type": "u8"
+          },
+          {
+            "name": "operation_deposit_stake_account_fee",
+            "type": "u8"
+          },
+          {
+            "name": "operation_liquid_unstake_fee",
+            "type": "u8"
+          },
+          {
+            "name": "operation_delayed_unstake_fee",
+            "type": "u8"
+          },
+          {
+            "name": "accum_deposit_sol_fee",
+            "type": "u64"
+          },
+          {
+            "name": "accum_deposit_stake_account_fee",
+            "type": "u64"
+          },
+          {
+            "name": "accum_liquid_unstake_fee",
+            "type": "u64"
+          },
+          {
+            "name": "accum_delayed_unstake_fee",
+            "type": "u64"
+          }
+        ]
+      },
+      "docs": [
+        "referral PDA"
+      ]
+    }
+  ],
+  "constants": []
+}

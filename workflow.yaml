@@ -1,0 +1,54 @@
+version: "1"
+
+nodes:
+  - id: migrate-anchor-idl
+    name: "Migrate Anchor IDL v0 → v1"
+    type: automatic
+    steps:
+      # Step 1: Deterministic migration — handles 100% of the 12 documented
+      # transform rules with zero false positives.
+      - name: "Run deterministic IDL migration (all 12 transform rules)"
+        js-ast-grep:
+          js_file: "scripts/codemod.ts"
+          language: "json"
+          include:
+            - "**/target/idl/*.json"
+            - "**/idl/*.json"
+            - "**/src/idl/*.json"
+            - "**/src/artifacts/*.json"
+            - "**/artifacts/*.json"
+
+      # Step 2: AI cleanup for the remaining ~10% of edge cases that require
+      # judgment — duplicate type resolution, pre-discriminator programs,
+      # dropped custom metadata fields, and unusual seed types.
+      - name: "AI fixups for edge cases (skipped if no LLM_API_KEY)"
+        ai:
+          prompt: |
+            You are reviewing an Anchor IDL migration from v0 to v1 format.
+            The deterministic codemod has already applied all 12 standard transform rules.
+            Your job is to fix any remaining issues that require judgment.
+
+            Check and fix the following edge cases:
+
+            1. DUPLICATE TYPES: If types[] contains entries with the same name,
+               keep the entry that has the most complete field definition and remove duplicates.
+
+            2. PRE-DISCRIMINATOR PROGRAMS: If this program was built with Anchor < 0.26,
+               instruction discriminators may use the original camelCase name instead of snake_case.
+               If you see evidence of this (e.g., the IDL has a "metadata.version" below 0.26 format,
+               or the instruction names were not camelCase to begin with), annotate with a TODO comment
+               in a "docs" field: "TODO: verify discriminator matches deployed binary".
+
+            3. DROPPED METADATA: If the original v0 IDL had custom fields in metadata{}
+               (e.g., "contact", "deployments", "repository") that are not in the v1 spec,
+               add them as top-level fields in the migrated IDL with a comment.
+
+            4. PROGRAM ADDRESS: If "address" is "11111111111111111111111111111111" (the system
+               program placeholder), add a TODO annotation in the docs field:
+               "TODO: replace placeholder address with actual program address".
+
+            5. UNUSUAL SEED TYPES: If any PDA seed has a kind other than "const", "arg",
+               or "account", verify it was passed through correctly.
+
+            Only modify files that actually need changes. Keep formatting consistent (2-space JSON indent).
+          model: "gpt-4o"
