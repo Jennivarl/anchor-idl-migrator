@@ -385,6 +385,162 @@ _del(tmpFile2);
 assert(alreadyV1.metadata?.spec != null, 'skip guard: v1 file has spec (would be skipped by codemod)');
 
 // ---------------------------------------------------------------------------
+// Rust source migration (migrate-rust.mjs)
+// ---------------------------------------------------------------------------
+import { migrateRustSource, migrateCargoToml } from './migrate-rust.mjs';
+
+console.log('\n── Rust source migration tests ──\n');
+
+// ── R1: ctx.bumps patterns ──────────────────────────────────────────────────
+console.log('R1 — ctx.bumps access patterns:');
+
+{
+    const src = `ctx.bumps.get("state").unwrap()`;
+    const out = migrateRustSource(src);
+    assert(out === 'ctx.bumps.state', 'get("name").unwrap() → .name');
+}
+{
+    const src = `ctx.bumps.get("my_pda").copied().unwrap()`;
+    const out = migrateRustSource(src);
+    assert(out === 'ctx.bumps.my_pda', 'get("name").copied().unwrap() → .name');
+}
+{
+    const src = `ctx.bumps["authority"]`;
+    const out = migrateRustSource(src);
+    assert(out === 'ctx.bumps.authority', '["name"] → .name');
+}
+{
+    // Multiple in one file
+    const src = [
+        'let b1 = ctx.bumps.get("state").unwrap();',
+        'let b2 = ctx.bumps["vault"];',
+        'let b3 = ctx.bumps.get("escrow").copied().unwrap();',
+    ].join('\n');
+    const out = migrateRustSource(src);
+    assert(out.includes('ctx.bumps.state'), 'multi: state fixed');
+    assert(out.includes('ctx.bumps.vault'), 'multi: vault fixed');
+    assert(out.includes('ctx.bumps.escrow'), 'multi: escrow fixed');
+    assert(!out.includes('.get('), 'multi: no .get( remaining');
+}
+{
+    // Already v0.30 style — no change
+    const src = `ctx.bumps.state`;
+    const out = migrateRustSource(src);
+    assert(out === null, 'already-new-style: returns null (no change)');
+}
+
+// ── R3: CLOSED_ACCOUNT_DISCRIMINATOR ─────────────────────────────────────────
+console.log('\nR3 — CLOSED_ACCOUNT_DISCRIMINATOR:');
+{
+    const src = `let disc = CLOSED_ACCOUNT_DISCRIMINATOR;`;
+    const out = migrateRustSource(src);
+    assert(out !== null, 'CLOSED_ACCOUNT_DISCRIMINATOR triggers change');
+    assert(out.includes('TODO(anchor-0.30)'), 'replaced with TODO comment');
+}
+
+// ── R5: ProgramResult → Result<()> ───────────────────────────────────────────
+console.log('\nR5 — ProgramResult → Result<()>:');
+{
+    const src = `pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {`;
+    const out = migrateRustSource(src);
+    assert(out === `pub fn initialize(ctx: Context<Initialize>) -> Result<()> {`, 'ProgramResult → Result<()>');
+}
+{
+    // Multiple functions
+    const src = [
+        'pub fn init(ctx: Context<Init>) -> ProgramResult {',
+        '    Ok(())',
+        '}',
+        'pub fn close(ctx: Context<Close>) -> ProgramResult {',
+        '    Ok(())',
+        '}',
+    ].join('\n');
+    const out = migrateRustSource(src);
+    assert((out.match(/Result<\(\)>/g) || []).length === 2, 'two ProgramResult replaced');
+    assert(!out.includes('ProgramResult'), 'no ProgramResult remaining');
+}
+
+// ── R2: Cargo.toml migration ──────────────────────────────────────────────────
+console.log('\nR2 — Cargo.toml migration:');
+
+{
+    const src = `anchor-lang = "0.29.0"`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'bare version string triggers change');
+    assert(out.includes('"0.30.1"'), 'version bumped to 0.30.1');
+    assert(out.includes('idl-build'), 'idl-build feature added to bare dep');
+}
+{
+    const src = `anchor-lang = { version = "0.29.0", features = ["init_if_needed"] }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'inline table triggers change');
+    assert(out.includes('0.30.1'), 'version bumped in table');
+    assert(out.includes('"idl-build"'), 'idl-build appended to features list');
+    assert(out.includes('"init_if_needed"'), 'existing feature preserved');
+}
+{
+    // idl-build already present — should not duplicate
+    const src = `anchor-lang = { version = "0.29.0", features = ["idl-build"] }`;
+    const out = migrateCargoToml(src);
+    assert((out.match(/idl-build/g) || []).length === 1, 'idl-build not duplicated');
+}
+{
+    // anchor-spl bump
+    const src = `anchor-spl = "0.29.0"`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'anchor-spl triggers change');
+    assert(out.includes('0.30.1'), 'anchor-spl version bumped');
+}
+{
+    // overflow-checks added to [profile.release]
+    const src = [
+        '[profile.release]',
+        'lto = "fat"',
+    ].join('\n');
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'missing overflow-checks triggers change');
+    assert(out.includes('overflow-checks = true'), 'overflow-checks added');
+}
+{
+    // overflow-checks already present — no duplicate
+    const src = [
+        '[profile.release]',
+        'overflow-checks = true',
+        'lto = "fat"',
+    ].join('\n');
+    const out = migrateCargoToml(src);
+    assert(out === null, 'overflow-checks already present: no change (returns null)');
+}
+{
+    // Already on 0.30 — no version change needed
+    const src = `anchor-lang = { version = "0.30.1", features = ["idl-build"] }`;
+    const out = migrateCargoToml(src);
+    assert(out === null, 'already migrated Cargo.toml: returns null');
+}
+
+// ── Combined .rs file (realistic) ─────────────────────────────────────────────
+console.log('\nCombined realistic .rs file:');
+{
+    const src = [
+        'use anchor_lang::prelude::*;',
+        '',
+        'pub fn create(ctx: Context<Create>, amount: u64) -> ProgramResult {',
+        '    let bump = ctx.bumps.get("vault").unwrap();',
+        '    let vault = &mut ctx.accounts.vault;',
+        '    vault.bump = bump;',
+        '    // old: CLOSED_ACCOUNT_DISCRIMINATOR',
+        '    let _disc = CLOSED_ACCOUNT_DISCRIMINATOR;',
+        '    Ok(())',
+        '}',
+    ].join('\n');
+    const out = migrateRustSource(src);
+    assert(out !== null, 'combined: changes detected');
+    assert(out.includes('-> Result<()>'), 'combined: ProgramResult fixed');
+    assert(out.includes('ctx.bumps.vault'), 'combined: bump access fixed');
+    assert(out.includes('TODO(anchor-0.30)'), 'combined: CLOSED_ACCOUNT_DISCRIMINATOR fixed');
+}
+
+// ---------------------------------------------------------------------------
 // Results
 // ---------------------------------------------------------------------------
 console.log(`\n${'─'.repeat(40)}`);

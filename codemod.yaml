@@ -1,15 +1,15 @@
 schema_version: "1.0"
 
 name: "anchor-idl-v0-to-v1"
-version: "0.1.1"
-description: "Migrate Anchor IDL JSON files from v0 format (pre-Anchor 0.30) to v1 format. Handles discriminators, snake_case names, type renames, account/event struct extraction, PDA seed coercion, and all 12 documented transform rules."
+version: "0.1.2"
+description: "Migrate Anchor projects from v0.29 to v0.30: IDL JSON files (v0→v1 format) and Rust source files (bumps, Cargo.toml, ProgramResult, CLOSED_ACCOUNT_DISCRIMINATOR). Handles all 12 IDL transform rules plus 5 Rust breaking-change patterns."
 author: "Jennivarl"
 license: "MIT"
 workflow: "workflow.yaml"
 category: "migration"
 
 targets:
-  languages: ["json"]
+  languages: ["json", "rust"]
 
 keywords:
   - "anchor"
@@ -20,7 +20,9 @@ keywords:
   - "v0-to-v1"
   - "discriminator"
   - "borsh"
-
+  - "rust"
+  - "cargo"
+  - "0.29-to-0.30"
 registry:
   access: "public"
   visibility: "public"

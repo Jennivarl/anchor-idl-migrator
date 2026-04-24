@@ -52,3 +52,16 @@ nodes:
 
             Only modify files that actually need changes. Keep formatting consistent (2-space JSON indent).
           model: "gpt-4o"
+
+  - id: migrate-anchor-rust
+    name: "Migrate Anchor Rust source 0.29 → 0.30"
+    type: automatic
+    steps:
+      - name: "Run Rust source migration (bumps, Cargo.toml, ProgramResult)"
+        js-ast-grep:
+          js_file: "scripts/codemod-rust.ts"
+          language: "rust"
+          include:
+            - "programs/**/*.rs"
+            - "**/src/**/*.rs"
+            - "**/Cargo.toml"
