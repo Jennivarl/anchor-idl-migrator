@@ -1,0 +1,462 @@
+{
+  "address": "mTok58Lg4YfcmwqyrDHpf7ogp599WRhzb6PxjaBqAxS",
+  "metadata": {
+    "name": "spl_managed_token",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": ""
+  },
+  "instructions": [
+    {
+      "name": "initialize_mint",
+      "discriminator": [
+        209,
+        42,
+        195,
+        4,
+        129,
+        85,
+        209,
+        44
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "System program"
+          ]
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "decimals",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize_account",
+      "discriminator": [
+        74,
+        115,
+        99,
+        93,
+        197,
+        69,
+        103,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "System program"
+          ]
+        },
+        {
+          "name": "associated_token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Associated Token program"
+          ]
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer",
+      "discriminator": [
+        163,
+        52,
+        200,
+        231,
+        140,
+        3,
+        69,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "src_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "dst_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "mint_to",
+      "discriminator": [
+        241,
+        34,
+        48,
+        186,
+        37,
+        179,
+        123,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "burn",
+      "discriminator": [
+        116,
+        110,
+        29,
+        56,
+        107,
+        219,
+        42,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_account",
+      "discriminator": [
+        125,
+        255,
+        149,
+        14,
+        110,
+        34,
+        72,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "destination",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "approve",
+      "discriminator": [
+        69,
+        74,
+        217,
+        36,
+        115,
+        117,
+        97,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "delegate",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "revoke",
+      "discriminator": [
+        170,
+        23,
+        31,
+        34,
+        133,
+        173,
+        93,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "upstream_authority",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "freeze_authority",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "token_program",
+          "writable": false,
+          "signer": false,
+          "docs": [
+            "Token program"
+          ]
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [],
+  "events": [],
+  "errors": [],
+  "types": [],
+  "constants": []
+}

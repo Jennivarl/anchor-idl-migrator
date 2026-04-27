@@ -7,7 +7,10 @@
         "anchor-idl-migrate": "./migrate.mjs"
     },
     "scripts": {
-        "test": "node test.mjs"
+        "test": "node test.mjs",
+        "test:real-world": "node tests/real-world-migrate.mjs",
+        "analyze:rust": "node analyze-rust-repo.mjs",
+        "fetch-idls": "node fetch-idls.mjs"
     },
     "keywords": [
         "anchor",

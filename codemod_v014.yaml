@@ -1,15 +1,15 @@
 schema_version: "1.0"
 
 name: "anchor-idl-v0-to-v1"
-version: "0.1.16"
-description: "Complete Anchor 0.29 to 0.30 migration: IDL JSON v0 to v1 (12 rules), Rust source (5 rules), TypeScript/JS client (6 rules), Anchor.toml config (2 rules), workspace Cargo.toml (resolver 2). Validated on MetaDAO 9 programs and Drift v2 250 TS files. Zero false positives."
+version: "0.1.14"
+description: "Migrate Anchor projects from v0.29 to v0.30: IDL JSON files (v0 to v1 format) and Rust source files (bumps, Cargo.toml, ProgramResult, CLOSED_ACCOUNT_DISCRIMINATOR). Handles all 12 IDL transform rules plus 5 Rust breaking-change patterns."
 author: "Jennivarl"
 license: "MIT"
 workflow: "workflow.yaml"
 category: "migration"
 
 targets:
-  languages: ["json", "rust", "typescript"]
+  languages: ["json", "rust"]
 
 keywords:
   - "anchor"

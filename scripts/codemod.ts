@@ -1,55 +1,45 @@
 /**
- * Anchor IDL v0 → v1 JSSG codemod
+ * Anchor IDL v0 -> v1 JSSG codemod
  *
- * This script is invoked by the Codemod workflow for each JSON file that
- * matches the include patterns. It parses the file as an Anchor v0 IDL and
- * rewrites it in v1 format in-place.
+ * Called by butterflow as: transform(sgRoot, options)
+ * where sgRoot is the ast-grep root node for the file.
+ * Source text: sgRoot.text() or sgRoot.root().text()
  *
- * All 12 documented transform rules are applied deterministically.
- * Zero false positives: files that are already v1 (metadata.spec present)
- * or are not Anchor IDLs are skipped silently.
- *
- * Migration logic lives in ../migrate.mjs — single source of truth.
+ * Return a string to write new content, or undefined to leave unchanged.
  */
 
-import { readFileSync, writeFileSync } from "fs";
-// @ts-ignore — migrate.mjs is plain ESM JS; Rolldown bundles it correctly
+// @ts-ignore
 import { migrateIdl } from "../migrate.mjs";
 
-// Inline type — avoids dependency on @codemod-utils/codemod-types
-type CodemodOptions = { path?: string;[key: string]: unknown };
-
-// ---------------------------------------------------------------------------
-// JSSG codemod entry point
-// ---------------------------------------------------------------------------
-
-const codemod = async (_root: unknown, options: CodemodOptions) => {
-    const filePath = options.path;
-    if (!filePath) return;
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const codemod = (sgRoot: any, options: any): string | undefined => {
+    // Get the file source text from the ast-grep root node
     let raw: string;
     try {
-        raw = readFileSync(filePath, "utf-8");
+        raw = typeof sgRoot?.text === "function"
+            ? sgRoot.text()
+            : (typeof sgRoot?.root === "function" ? sgRoot.root().text() : "");
     } catch {
-        return; // unreadable — skip
+        raw = "";
     }
+
+    // Fallback to options.source if sgRoot.text() is unavailable
+    if (!raw) raw = options?.source ?? "";
+    if (!raw) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let idl: any;
     try {
         idl = JSON.parse(raw);
     } catch {
-        return; // not valid JSON — skip silently
+        return;
     }
 
-    // Skip if already v1 (has metadata.spec)
     if (idl?.metadata?.spec != null) return;
-
-    // Skip if clearly not an Anchor IDL (must have instructions array)
     if (!Array.isArray(idl?.instructions)) return;
 
     const v1 = migrateIdl(idl);
-    writeFileSync(filePath, JSON.stringify(v1, null, 2) + "\n", "utf-8");
+    return JSON.stringify(v1, null, 2) + "\n";
 };
 
 export default codemod;

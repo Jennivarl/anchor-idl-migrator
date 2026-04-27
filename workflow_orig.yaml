@@ -57,7 +57,7 @@ nodes:
     name: "Migrate Anchor Rust source 0.29 → 0.30"
     type: automatic
     steps:
-      - name: "Run Rust source migration (bumps, Cargo.toml, Anchor.toml)"
+      - name: "Run Rust source migration (bumps, Cargo.toml, ProgramResult)"
         js-ast-grep:
           js_file: "scripts/codemod-rust.ts"
           language: "rust"
@@ -65,51 +65,3 @@ nodes:
             - "programs/**/*.rs"
             - "**/src/**/*.rs"
             - "**/Cargo.toml"
-            - "**/Anchor.toml"
-
-  - id: migrate-anchor-ts-client
-    name: "Migrate Anchor TypeScript/JavaScript client 0.29 → 0.30"
-    type: automatic
-    steps:
-      # Step 4: Migrate TypeScript/JavaScript source files.
-      # Handles:
-      #   T1 — @project-serum/anchor → @coral-xyz/anchor imports
-      #   T2 — new Program(idl, programId, provider) → new Program(idl, provider)
-      #         (programId parameter removed in 0.30, now derived from IDL address)
-      #   T3 — .associated() / .associatedAddress() calls → TODO comment
-      #         (both methods removed in 0.30 #2749)
-      #   T4 — anchor-deprecated-state references → TODO comment
-      #         (feature removed in 0.30 #2717)
-      - name: "Run TypeScript client migration (T1–T4)"
-        js-ast-grep:
-          js_file: "scripts/codemod-ts.ts"
-          language: "typescript"
-          include:
-            - "app/**/*.ts"
-            - "app/**/*.tsx"
-            - "app/**/*.js"
-            - "app/**/*.jsx"
-            - "tests/**/*.ts"
-            - "tests/**/*.js"
-            - "client/**/*.ts"
-            - "client/**/*.js"
-            - "sdk/**/*.ts"
-            - "sdk/**/*.js"
-            - "scripts/**/*.ts"
-            - "scripts/**/*.js"
-            - "src/**/*.ts"
-            - "src/**/*.tsx"
-            - "src/**/*.js"
-            - "migrations/**/*.ts"
-            - "migrations/**/*.js"
-
-      # Step 5: Update @coral-xyz/anchor version in package.json files.
-      # P1 — "0.29.x" → "0.30.1"
-      # P2 — @project-serum/anchor package key → @coral-xyz/anchor
-      - name: "Update package.json anchor dependency versions (P1–P2)"
-        js-ast-grep:
-          js_file: "scripts/codemod-ts.ts"
-          language: "json"
-          include:
-            - "**/package.json"
-            - "!**/node_modules/**"

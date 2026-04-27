@@ -5,14 +5,17 @@
  *
  * Rules applied (all text-level, no AST required for these changes):
  *
- * R1. ctx.bumps.get("name").unwrap()  →  ctx.bumps.name
- *     ctx.bumps["name"]               →  ctx.bumps.name
- *     ctx.bumps.get("name").copied().unwrap() → ctx.bumps.name   (variant)
+ * R1. ctx.bumps.get("name").unwrap()          →  ctx.bumps.name
+ *     ctx.bumps["name"]                       →  ctx.bumps.name
+ *     ctx.bumps.get("name").copied().unwrap() →  ctx.bumps.name
+ *     ctx.bumps.get("name").copied()          →  ctx.bumps.name  (optional accounts)
  *
  * R2. Cargo.toml — anchor-lang/anchor-spl version bumps:
  *       "0.29.x"  →  "0.30.1"
- *       adds `idl-build` feature to anchor-lang dep if missing
+ *       adds `idl-build` feature to anchor-lang and anchor-spl if missing
+ *       renames `seeds` feature to `resolution` in anchor-lang features
  *       adds `overflow-checks = true` to [profile.release] if missing
+ *       handles `workspace = true` deps (no version, just adds idl-build feature)
  *
  * R3. `CLOSED_ACCOUNT_DISCRIMINATOR`  →  removed (Anchor 0.30 drops it);
  *     usage replaced with a compile-time TODO comment.
@@ -27,8 +30,8 @@
  *   node migrate-rust.mjs src/           (walks all .rs + Cargo.toml files)
  */
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
-import { join, extname } from 'path';
+import { readFileSync, writeFileSync, renameSync, readdirSync, statSync, lstatSync, realpathSync } from 'fs';
+import { join, extname, basename } from 'path';
 
 // ── R1 helpers ──────────────────────────────────────────────────────────────
 
@@ -42,14 +45,20 @@ import { join, extname } from 'path';
  *   #[account(bump = ctx.bumps["name"])]    → #[account(bump = ctx.bumps.name)]
  */
 function fixBumps(src) {
-    // ctx.bumps.get("name").copied().unwrap()
+    // ctx.bumps.get("name").copied().unwrap()  — required account, most specific first
     src = src.replace(
         /ctx\.bumps\.get\("([^"]+)"\)\.copied\(\)\.unwrap\(\)/g,
         'ctx.bumps.$1',
     );
-    // ctx.bumps.get("name").unwrap()
+    // ctx.bumps.get("name").unwrap()  — required account
     src = src.replace(
         /ctx\.bumps\.get\("([^"]+)"\)\.unwrap\(\)/g,
+        'ctx.bumps.$1',
+    );
+    // ctx.bumps.get("name").copied()  — optional account (returns Option<u8>)
+    // In 0.30 optional bumps are ctx.bumps.name which returns Option<u8>
+    src = src.replace(
+        /ctx\.bumps\.get\("([^"]+)"\)\.copied\(\)/g,
         'ctx.bumps.$1',
     );
     // ctx.bumps["name"]
@@ -77,7 +86,11 @@ function fixClosedAccountDiscriminator(src) {
  * Only replaces `-> ProgramResult` (function return position).
  */
 function fixProgramResult(src) {
-    return src.replace(/-> ProgramResult\b/g, '-> Result<()>');
+    // Bare form: -> ProgramResult
+    // Fully-qualified form: -> anchor_lang::solana_program::entrypoint::ProgramResult
+    src = src.replace(/-> anchor_lang::solana_program::entrypoint::ProgramResult\b/g, '-> Result<()>');
+    src = src.replace(/-> ProgramResult\b/g, '-> Result<()>');
+    return src;
 }
 
 // ── .rs migration ───────────────────────────────────────────────────────────
@@ -102,7 +115,9 @@ export function migrateRustSource(src) {
 /**
  * Migrate a Cargo.toml string:
  *   - Bump anchor-lang / anchor-spl versions 0.29.x → 0.30.1
- *   - Add `idl-build` to anchor-lang features if missing
+ *   - Rename `seeds` feature to `resolution` in anchor-lang features
+ *   - Add `idl-build` to anchor-lang and anchor-spl features if missing
+ *   - Handle `workspace = true` deps — adds `idl-build` feature
  *   - Add `overflow-checks = true` to [profile.release] if missing
  *
  * Returns null if no changes were made.
@@ -114,24 +129,34 @@ export function migrateCargoToml(src) {
     let out = src;
 
     // Bump anchor-lang version  "0.29.x" → "0.30.1"
-    // Handles: anchor-lang = "0.29.0", anchor-lang = { version = "0.29.0", ... }
+    // Handles: anchor-lang = "0.29.0", anchor-lang = "^0.29.0", anchor-lang = { version = "0.29.0", ... }
     out = out.replace(
-        /(anchor-lang\s*=\s*(?:"|\{\s*version\s*=\s*"))0\.29\.\d+/g,
+        /(anchor-lang\s*=\s*(?:"|\{\s*version\s*=\s*"))[~^]?0\.29\.\d+/g,
         '$10.30.1',
     );
     // Same for anchor-spl
     out = out.replace(
-        /(anchor-spl\s*=\s*(?:"|\{\s*version\s*=\s*"))0\.29\.\d+/g,
+        /(anchor-spl\s*=\s*(?:"|\{\s*version\s*=\s*"))[~^]?0\.29\.\d+/g,
         '$10.30.1',
     );
 
-    // Add idl-build feature to anchor-lang if it's an inline table dep
+    // ── Rename `seeds` feature to `resolution` in anchor-lang deps ──────────
+    // Anchor 0.30 renamed the `seeds` feature to `resolution` (enabled by default)
+    out = out.replace(
+        /(anchor-lang\s*=\s*\{[^}]*features\s*=\s*\[)([^\]]*?)(\])/g,
+        (match, pre, feats, close) => {
+            const renamed = feats.replace(/"seeds"/g, '"resolution"');
+            return renamed !== feats ? `${pre}${renamed}${close}` : match;
+        },
+    );
+
+    // ── Add idl-build to anchor-lang inline table dep ─────────────────────────
     // e.g.  anchor-lang = { version = "0.30.1", features = ["init_if_needed"] }
     // → anchor-lang = { version = "0.30.1", features = ["init_if_needed", "idl-build"] }
     out = out.replace(
         /(anchor-lang\s*=\s*\{[^}]*features\s*=\s*\[)([^\]]*?)(\])/g,
         (match, pre, feats, close) => {
-            if (feats.includes('idl-build')) return match; // already there
+            if (feats.includes('idl-build')) return match;
             const sep = feats.trim() === '' ? '' : ', ';
             return `${pre}${feats}${sep}"idl-build"${close}`;
         },
@@ -140,17 +165,92 @@ export function migrateCargoToml(src) {
     // If anchor-lang is a bare string dep (no features), convert to table and add idl-build
     // e.g.  anchor-lang = "0.30.1"  →  anchor-lang = { version = "0.30.1", features = ["idl-build"] }
     out = out.replace(
-        /^(anchor-lang\s*=\s*)"(0\.30\.\d+)"$/m,
-        '$1{ version = "$2", features = ["idl-build"] }',
+        /^(anchor-lang\s*=\s*)"([~^]?0\.30\.\d+)"$/m,
+        (_, pre, ver) => `${pre}{ version = "${ver.replace(/^[~^]/, '')}", features = ["idl-build"] }`,
     );
 
-    // Add overflow-checks to [profile.release] if missing
+    // If anchor-lang uses workspace = true but has no features key → add idl-build
+    // e.g.  anchor-lang = { workspace = true }  →  anchor-lang = { workspace = true, features = ["idl-build"] }
+    out = out.replace(
+        /^(anchor-lang\s*=\s*\{)([^}]*workspace\s*=\s*true[^}]*)(\s*\})$/gm,
+        (match, open, body, close) => {
+            if (body.includes('features')) return match; // already has features
+            return `${open}${body.trimEnd()}, features = ["idl-build"]${close}`;
+        },
+    );
+
+    // ── Add idl-build to anchor-spl inline table dep ──────────────────────────
+    out = out.replace(
+        /(anchor-spl\s*=\s*\{[^}]*features\s*=\s*\[)([^\]]*?)(\])/g,
+        (match, pre, feats, close) => {
+            if (feats.includes('idl-build')) return match;
+            const sep = feats.trim() === '' ? '' : ', ';
+            return `${pre}${feats}${sep}"idl-build"${close}`;
+        },
+    );
+
+    // If anchor-spl is a bare string dep (no features), convert to table and add idl-build
+    out = out.replace(
+        /^(anchor-spl\s*=\s*)"([~^]?0\.30\.\d+)"$/m,
+        (_, pre, ver) => `${pre}{ version = "${ver.replace(/^[~^]/, '')}", features = ["idl-build"] }`,
+    );
+
+    // If anchor-spl uses workspace = true but has no features key → add idl-build
+    out = out.replace(
+        /^(anchor-spl\s*=\s*\{)([^}]*workspace\s*=\s*true[^}]*)(\s*\})$/gm,
+        (match, open, body, close) => {
+            if (body.includes('features')) return match;
+            return `${open}${body.trimEnd()}, features = ["idl-build"]${close}`;
+        },
+    );
+
+    // ── Add overflow-checks to [profile.release] if missing ───────────────────
     if (out.includes('[profile.release]') && !out.includes('overflow-checks')) {
         out = out.replace(
             /(\[profile\.release\])/,
             '$1\noverflow-checks = true',
         );
     }
+
+    // ── R6: Add resolver = "2" to [workspace] if missing ─────────────────────
+    // Anchor 0.30 requires the Cargo resolver v2 for feature unification.
+    if (out.includes('[workspace]') && !out.includes('resolver')) {
+        // Insert resolver after the opening [workspace] line
+        out = out.replace(
+            /(\[workspace\]\r?\n)/,
+            '$1resolver = "2"\n',
+        );
+    }
+
+    return out === src ? null : out;
+}
+
+// ── Anchor.toml migration ───────────────────────────────────────────────────
+
+/**
+ * Migrate an Anchor.toml string:
+ *   - A1: Remove `seeds = false` from [features] (feature removed in 0.30)
+ *   - A2: Bump `anchor_version` to "0.30.1" if present
+ *
+ * Returns null if no changes were made.
+ *
+ * @param {string} src  Raw Anchor.toml content
+ * @returns {string|null}
+ */
+export function migrateAnchorToml(src) {
+    let out = src;
+
+    // A1: Remove `seeds = false` line — the `seeds` resolution feature is
+    // enabled unconditionally in 0.30 and the flag was removed entirely.
+    // Leaving it causes `anchor build` to fail with an unknown feature error.
+    out = out.replace(/^[ \t]*seeds\s*=\s*false[ \t]*\r?\n?/m, '');
+
+    // A2: Bump anchor_version (appears in some Anchor.toml toolchain sections)
+    // Only upgrade from 0.29.x — never touch 0.30.x or higher to avoid downgrades.
+    out = out.replace(
+        /(anchor_version\s*=\s*")0\.29\.\d+"/,
+        '$10.30.1"',
+    );
 
     return out === src ? null : out;
 }
@@ -170,12 +270,24 @@ export function migrateFile(filePath) {
 
     if (filePath.endsWith('Cargo.toml')) {
         result = migrateCargoToml(src);
+    } else if (basename(filePath) === 'Anchor.toml') {
+        result = migrateAnchorToml(src);
     } else if (extname(filePath) === '.rs') {
         result = migrateRustSource(src);
     }
 
     if (result !== null) {
-        writeFileSync(filePath, result, 'utf-8');
+        if (lstatSync(filePath).isSymbolicLink()) {
+            throw new Error(`Refusing to write to symlink: ${filePath}`);
+        }
+        const tmp = filePath + '.migrating.tmp';
+        try {
+            writeFileSync(tmp, result, 'utf-8');
+            renameSync(tmp, filePath);
+        } catch (err) {
+            try { writeFileSync(tmp, '', 'utf-8'); renameSync(tmp, tmp + '.del'); } catch { }
+            throw err;
+        }
         return true;
     }
     return false;
@@ -188,16 +300,21 @@ export function migrateFile(filePath) {
  * @param {string} dir
  * @returns {string[]} list of changed file paths
  */
-export function migrateDirectory(dir) {
+export function migrateDirectory(dir, _visited = new Set()) {
+    const realDir = realpathSync(dir);
+    if (_visited.has(realDir)) return [];
+    _visited.add(realDir);
+
     const changed = [];
     const entries = readdirSync(dir);
     for (const entry of entries) {
         if (entry === 'target' || entry === '.git') continue;
         const full = join(dir, entry);
-        const st = statSync(full);
-        if (st.isDirectory()) {
-            changed.push(...migrateDirectory(full));
-        } else if (entry === 'Cargo.toml' || extname(entry) === '.rs') {
+        const lst = lstatSync(full);
+        if (lst.isSymbolicLink()) continue;
+        if (lst.isDirectory()) {
+            changed.push(...migrateDirectory(full, _visited));
+        } else if (entry === 'Cargo.toml' || entry === 'Anchor.toml' || extname(entry) === '.rs') {
             if (migrateFile(full)) changed.push(full);
         }
     }
@@ -206,7 +323,8 @@ export function migrateDirectory(dir) {
 
 // ── CLI entry point ─────────────────────────────────────────────────────────
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+const _isCliRust = (() => { try { return import.meta.url ? process.argv[1] === new URL(import.meta.url).pathname : false; } catch { return false; } })();
+if (_isCliRust) {
     const target = process.argv[2];
     if (!target) {
         console.error('Usage: node migrate-rust.mjs <file.rs|Cargo.toml|directory>');

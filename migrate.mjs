@@ -25,7 +25,7 @@
  */
 
 import { createHash } from 'crypto';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync } from 'fs';
 
 // ---------------------------------------------------------------------------
 // Discriminator helpers
@@ -78,7 +78,8 @@ function toSnakeCase(str) {
  *   { "definedWithTypeArgs": { ... } } → { "defined": { "name": "...", "generics": [...] } }
  *   All other primitives stay the same.
  */
-function convertType(ty) {
+function convertType(ty, depth = 0) {
+    if (depth > 100) throw new Error('convertType: type nesting depth exceeds 100 — possible circular IDL structure');
     if (ty === null || ty === undefined) return ty;
 
     // Primitive string types (bool, u8, u16, u32, u64, u128, i8, i16, i32, i64,
@@ -108,14 +109,14 @@ function convertType(ty) {
     }
 
     // Compound types with nested type payloads
-    if ('option' in ty) return { option: convertType(ty.option) };
-    if ('vec' in ty) return { vec: convertType(ty.vec) };
-    if ('array' in ty) return { array: [convertType(ty.array[0]), ty.array[1]] };
-    if ('coption' in ty) return { coption: convertType(ty.coption) };
+    if ('option' in ty) return { option: convertType(ty.option, depth + 1) };
+    if ('vec' in ty) return { vec: convertType(ty.vec, depth + 1) };
+    if ('array' in ty) return { array: [convertType(ty.array[0], depth + 1), ty.array[1]] };
+    if ('coption' in ty) return { coption: convertType(ty.coption, depth + 1) };
 
     // Legacy: genericLenArray → v1 array with generic length
     if ('genericLenArray' in ty) {
-        return { array: [convertType(ty.genericLenArray[0]), ty.genericLenArray[1]] };
+        return { array: [convertType(ty.genericLenArray[0], depth + 1), ty.genericLenArray[1]] };
     }
 
     // Legacy: definedWithTypeArgs → v1 defined with generics
@@ -140,7 +141,7 @@ function convertType(ty) {
  * Convert a v0 generic type argument to v1.
  */
 function convertGenericArg(arg) {
-    if ('type' in arg) return { type: convertType(arg.type) };
+    if ('type' in arg) return { type: convertType(arg.type, 0) };
     if ('value' in arg) return { const: arg.value };
     if ('generic' in arg) return { type: { generic: arg.generic } };
     return arg;
@@ -284,7 +285,7 @@ function convertTypeDefBody(ty) {
                             v.fields = variant.fields.map(convertField);
                         } else {
                             // Tuple fields (array of types)
-                            v.fields = variant.fields.map(f => convertType(typeof f === 'string' || !('name' in (f || {})) ? f : f.type ?? f.ty));
+                            v.fields = variant.fields.map(f => convertType(typeof f === 'string' || !('name' in (f || {})) ? f : f.type ?? f.ty, 0));
                         }
                     }
 
@@ -296,7 +297,7 @@ function convertTypeDefBody(ty) {
         case 'alias':
             // v0 alias: { kind: "alias", value: <type> }
             // v1 uses "type" kind: { kind: "type", alias: <type> }
-            return { kind: 'type', alias: convertType(ty.value) };
+            return { kind: 'type', alias: convertType(ty.value, 0) };
 
         default:
             return ty;
@@ -354,12 +355,22 @@ function convertEventToTypeDef(event) {
  */
 export function migrateIdl(idl, programAddress = null) {
     // ── Address ────────────────────────────────────────────────────────────────
-    const address =
+    const resolvedAddress =
         programAddress ||
         idl?.metadata?.address ||
         idl?.metadata?.programId ||
         idl?.programId ||
-        '11111111111111111111111111111111'; // system program as fallback
+        null;
+
+    if (!resolvedAddress) {
+        process.stderr.write(
+            'Warning: no program address found in IDL (metadata.address, metadata.programId, or programId).\n' +
+            '  Using placeholder "PLACEHOLDER_PROGRAM_ADDRESS" — replace with your actual program address.\n' +
+            '  Pass --address <PROGRAM_ADDRESS> on the CLI or set idl.metadata.address in your v0 IDL.\n',
+        );
+    }
+
+    const address = resolvedAddress ?? 'PLACEHOLDER_PROGRAM_ADDRESS';
 
     // ── Instructions ──────────────────────────────────────────────────────────
     const instructions = (idl.instructions ?? []).map(ix => {
@@ -451,11 +462,18 @@ export function isV1Idl(idl) {
 // CLI entry point
 // ---------------------------------------------------------------------------
 
-// Normalise paths for cross-platform comparison (handles Windows backslashes
-// and the leading "/" that URL adds on Windows, e.g. /C:/Users/...)
-const _argv1Norm = process.argv[1]?.replace(/\\/g, '/').replace(/^\/([A-Za-z]:)/, '$1').toLowerCase();
-const _selfNorm = new URL(import.meta.url).pathname.replace(/\\/g, '/').replace(/^\/([A-Za-z]:)/, '$1').toLowerCase();
-if (_argv1Norm === _selfNorm) {
+// Detect CLI invocation without using new URL(import.meta.url) at module load
+// time — that crashes when Rolldown bundles this file (import.meta.url becomes
+// undefined/empty inside the bundle, throwing "Invalid URL").
+const _isCli = (() => {
+    try {
+        if (!import.meta.url) return false;
+        const _argv1Norm = process.argv[1]?.replace(/\\/g, '/').replace(/^\/([A-Za-z]:)/, '$1').toLowerCase();
+        const _selfNorm = new URL(import.meta.url).pathname.replace(/\\/g, '/').replace(/^\/([A-Za-z]:)/, '$1').toLowerCase();
+        return _argv1Norm === _selfNorm;
+    } catch { return false; }
+})();
+if (_isCli) {
     const args = process.argv.slice(2);
 
     if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
@@ -490,6 +508,11 @@ Examples:
     for (let i = 0; i < args.length; i++) {
         if ((args[i] === '--address' || args[i] === '-a') && args[i + 1]) {
             programAddress = args[++i];
+            // Validate: Solana addresses are base58-encoded 32-byte public keys (32–44 chars)
+            if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(programAddress)) {
+                console.error(`Error: invalid --address "${programAddress}" — must be a base58-encoded Solana public key (32–44 chars, no 0/O/I/l).`);
+                process.exit(1);
+            }
         } else if (!inputFile) {
             inputFile = args[i];
         } else if (!outputFile) {
@@ -518,7 +541,9 @@ Examples:
     const outputJson = JSON.stringify(output, null, 2);
 
     if (outputFile) {
-        writeFileSync(outputFile, outputJson, 'utf-8');
+        const tmp = outputFile + '.migrating.tmp';
+        writeFileSync(tmp, outputJson, 'utf-8');
+        renameSync(tmp, outputFile);
         console.error(`✓ Migrated IDL written to ${outputFile}`);
     } else {
         process.stdout.write(outputJson + '\n');

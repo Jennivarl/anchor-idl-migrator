@@ -1,0 +1,32 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to codemod.com
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout pinned to commit SHA (v4.2.2)
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # actions/setup-node pinned to commit SHA (v4.4.0)
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+
+      - name: Run tests before publishing
+        run: node test.mjs
+
+      - name: Publish codemod
+        # CODEMOD_TOKEN must be stored as a repository/environment secret.
+        # Never commit credentials. Rotate the token if it is ever exposed.
+        run: npx codemod publish . --token "$CODEMOD_TOKEN"
+        env:
+          CODEMOD_TOKEN: ${{ secrets.CODEMOD_TOKEN }}

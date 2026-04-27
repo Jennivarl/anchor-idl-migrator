@@ -4,6 +4,14 @@
  */
 import { createHash } from 'crypto';
 import { migrateIdl, isV1Idl } from './migrate.mjs';
+import {
+    fixProjectSerumImport,
+    fixProgramConstructor,
+    flagAssociatedMethods,
+    flagDeprecatedState,
+    migrateTypeScript,
+    migratePackageJson,
+} from './migrate-ts.mjs';
 
 let passed = 0;
 let failed = 0;
@@ -471,6 +479,22 @@ console.log('\nR2 — Cargo.toml migration:');
     assert(out.includes('idl-build'), 'idl-build feature added to bare dep');
 }
 {
+    // ^ prefix semver range — futarchy-style
+    const src = `anchor-lang = "^0.29.0"\nanchor-spl = "^0.29.0"`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, '^0.29.0 prefix triggers change');
+    assert(out.includes('0.30.1'), '^0.29.0: version bumped');
+    assert(out.includes('idl-build'), '^0.29.0: idl-build added');
+    assert(!out.includes('^0.30'), '^0.29.0: caret stripped from 0.30.1');
+}
+{
+    // ~ prefix semver range
+    const src = `anchor-lang = "~0.29.0"`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, '~0.29.0 prefix triggers change');
+    assert(out.includes('0.30.1'), '~0.29.0: version bumped');
+}
+{
     const src = `anchor-lang = { version = "0.29.0", features = ["init_if_needed"] }`;
     const out = migrateCargoToml(src);
     assert(out !== null, 'inline table triggers change');
@@ -538,6 +562,378 @@ console.log('\nCombined realistic .rs file:');
     assert(out.includes('-> Result<()>'), 'combined: ProgramResult fixed');
     assert(out.includes('ctx.bumps.vault'), 'combined: bump access fixed');
     assert(out.includes('TODO(anchor-0.30)'), 'combined: CLOSED_ACCOUNT_DISCRIMINATOR fixed');
+}
+
+// ---------------------------------------------------------------------------
+// R1 — optional-account bump: ctx.bumps.get("name").copied() (no unwrap)
+// ---------------------------------------------------------------------------
+console.log('\nR1 — optional-account bump (no unwrap):');
+{
+    const src = `ctx.bumps.get("vault").copied()`;
+    const out = migrateRustSource(src);
+    assert(out === 'ctx.bumps.vault', 'get("name").copied() \u2192 .name (optional bump)');
+}
+{
+    // All three variants in one file
+    const src = [
+        'let b1 = ctx.bumps.get("required").unwrap();',
+        'let b2 = ctx.bumps.get("optional").copied();',
+        'let b3 = ctx.bumps.get("also_req").copied().unwrap();',
+    ].join('\n');
+    const out = migrateRustSource(src);
+    assert(out.includes('ctx.bumps.required'), 'unwrap variant replaced');
+    assert(out.includes('ctx.bumps.optional'), 'copied-only variant replaced');
+    assert(out.includes('ctx.bumps.also_req'), 'copied+unwrap variant replaced');
+    assert(!out.includes('.get('), 'no .get( remaining after all three');
+}
+
+// ---------------------------------------------------------------------------
+// R2 — seeds → resolution feature rename
+// ---------------------------------------------------------------------------
+console.log('\nR2 — seeds feature renamed to resolution:');
+{
+    const src = `anchor-lang = { version = "0.29.0", features = ["seeds"] }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'seeds rename triggers change');
+    assert(out.includes('"resolution"'), '"resolution" present');
+    assert(!out.includes('"seeds"'), '"seeds" removed');
+}
+{
+    const src = `anchor-lang = { version = "0.29.0", features = ["seeds", "init_if_needed"] }`;
+    const out = migrateCargoToml(src);
+    assert(out.includes('"resolution"'), 'seeds renamed in multi-feature list');
+    assert(out.includes('"init_if_needed"'), 'other features preserved after rename');
+}
+{
+    // No seeds feature — no rename
+    const src = `anchor-lang = { version = "0.29.0", features = ["init_if_needed"] }`;
+    const out = migrateCargoToml(src);
+    // version still bumps, but no seeds rename change
+    assert(!out || !out.includes('"resolution"'), 'no resolution added when seeds absent');
+}
+
+// ---------------------------------------------------------------------------
+// R2 — anchor-spl idl-build injection
+// ---------------------------------------------------------------------------
+console.log('\nR2 — anchor-spl idl-build:');
+{
+    const src = `anchor-spl = { version = "0.29.0", features = ["token"] }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'anchor-spl inline table triggers change');
+    assert(out.includes('0.30.1'), 'anchor-spl version bumped');
+    assert(out.includes('"idl-build"'), 'idl-build added to anchor-spl');
+    assert(out.includes('"token"'), 'existing anchor-spl feature preserved');
+}
+{
+    const src = `anchor-spl = "0.29.0"`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'anchor-spl bare string triggers change');
+    assert(out.includes('0.30.1'), 'version bumped');
+    assert(out.includes('"idl-build"'), 'idl-build added to bare anchor-spl');
+}
+{
+    // idl-build already present — no duplicate
+    const src = `anchor-spl = { version = "0.30.1", features = ["idl-build", "token"] }`;
+    const out = migrateCargoToml(src);
+    assert((out === null || (out.match(/idl-build/g) || []).length === 1), 'idl-build not duplicated in anchor-spl');
+}
+
+// ---------------------------------------------------------------------------
+// R2 — workspace = true deps get idl-build
+// ---------------------------------------------------------------------------
+console.log('\nR2 — workspace = true deps:');
+{
+    // anchor-lang with workspace = true, no features → add idl-build
+    const src = `anchor-lang = { workspace = true }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'workspace-only anchor-lang triggers change');
+    assert(out.includes('idl-build'), 'idl-build added to workspace-only anchor-lang');
+}
+{
+    // anchor-spl with workspace = true, no features → add idl-build
+    const src = `anchor-spl = { workspace = true }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'workspace-only anchor-spl triggers change');
+    assert(out.includes('idl-build'), 'idl-build added to workspace-only anchor-spl');
+}
+{
+    // workspace = true WITH existing features — idl-build appended
+    const src = `anchor-lang = { workspace = true, features = ["init_if_needed"] }`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'workspace dep with features triggers change');
+    assert(out.includes('"idl-build"'), 'idl-build appended to workspace dep features');
+    assert(out.includes('"init_if_needed"'), 'existing feature preserved in workspace dep');
+}
+{
+    // Full workspace Cargo.toml scenario
+    const src = [
+        '[workspace]',
+        'members = ["programs/*"]',
+        '',
+        '[workspace.dependencies]',
+        'anchor-lang = { version = "0.29.0", features = ["seeds"] }',
+        'anchor-spl = { version = "0.29.0", features = ["token"] }',
+        '',
+        '[profile.release]',
+        'lto = "fat"',
+    ].join('\n');
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'full workspace Cargo.toml triggers change');
+    assert(out.includes('0.30.1'), 'versions bumped in workspace deps');
+    assert(out.includes('"resolution"'), 'seeds renamed to resolution');
+    assert((out.match(/"idl-build"/g) || []).length === 2, 'idl-build added to both anchor-lang and anchor-spl');
+    assert(out.includes('overflow-checks = true'), 'overflow-checks added to [profile.release]');
+}
+{
+    // Member Cargo.toml using workspace = true for both deps
+    const src = [
+        '[dependencies]',
+        'anchor-lang = { workspace = true }',
+        'anchor-spl = { workspace = true, features = ["token"] }',
+    ].join('\n');
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'member Cargo.toml with workspace deps triggers change');
+    assert((out.match(/"idl-build"/g) || []).length === 2, 'idl-build added to both workspace deps');
+}
+
+// ── R6: workspace resolver = "2" ────────────────────────────────────────────
+console.log('\nR6 — workspace Cargo.toml resolver = "2":');
+{
+    const src = `[workspace]\nmembers = [\n    "programs/*"\n]\n`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'workspace Cargo.toml without resolver triggers change');
+    assert(out.includes('resolver = "2"'), 'resolver = "2" added');
+}
+{
+    const src = `[workspace]\nresolver = "2"\nmembers = [\n    "programs/*"\n]\n`;
+    const out = migrateCargoToml(src);
+    assert(out === null, 'workspace Cargo.toml already with resolver = unchanged');
+}
+{
+    // Non-workspace Cargo.toml — should not get resolver
+    const src = `[package]\nname = "my-program"\nversion = "0.1.0"\n\n[dependencies]\nanchor-lang = "0.29.0"\n`;
+    const out = migrateCargoToml(src);
+    assert(out !== null, 'non-workspace Cargo.toml still migrated (anchor-lang bump)');
+    assert(!out.includes('resolver'), 'resolver NOT added to non-workspace Cargo.toml');
+}
+
+// ---------------------------------------------------------------------------
+// Anchor.toml migration (A1–A2)
+// ---------------------------------------------------------------------------
+import { migrateAnchorToml } from './migrate-rust.mjs';
+
+console.log('\nA1 — Anchor.toml: remove seeds = false from [features]:');
+{
+    const src = `[features]\nseeds = false\nskip-lint = false\n`;
+    const out = migrateAnchorToml(src);
+    assert(out !== null, 'seeds = false triggers change');
+    assert(!out.includes('seeds = false'), 'seeds = false removed');
+    assert(out.includes('skip-lint = false'), 'skip-lint = false preserved');
+}
+{
+    // seeds = false with leading whitespace
+    const src = `[features]\n  seeds = false\nskip-lint = false\n`;
+    const out = migrateAnchorToml(src);
+    assert(out !== null, 'indented seeds = false removed');
+    assert(!out.includes('seeds'), 'seeds line gone');
+}
+{
+    // seeds = true should NOT be removed (only false is invalid)
+    const src = `[features]\nseeds = true\n`;
+    const out = migrateAnchorToml(src);
+    assert(out === null, 'seeds = true unchanged (only false is removed)');
+}
+{
+    // Already clean Anchor.toml — no seeds line
+    const src = `[features]\nskip-lint = false\n`;
+    const out = migrateAnchorToml(src);
+    assert(out === null, 'Anchor.toml without seeds = false unchanged (idempotent)');
+}
+
+console.log('\nA2 — Anchor.toml: bump anchor_version:');
+{
+    const src = `[toolchain]\nanchor_version = "0.29.0"\n`;
+    const out = migrateAnchorToml(src);
+    assert(out !== null, 'anchor_version triggers change');
+    assert(out.includes('anchor_version = "0.30.1"'), 'anchor_version bumped to 0.30.1');
+}
+{
+    // A1 + A2 combined (real-world Anchor.toml)
+    const src = `[toolchain]\nanchor_version = "0.29.0"\n\n[features]\nseeds = false\nskip-lint = false\n`;
+    const out = migrateAnchorToml(src);
+    assert(out !== null, 'combined A1+A2 triggers change');
+    assert(!out.includes('seeds = false'), 'A1: seeds line removed');
+    assert(out.includes('anchor_version = "0.30.1"'), 'A2: version bumped');
+}
+{
+    // anchor_version already at 0.30.x — idempotent
+    const src = `[features]\nseeds = false\n[toolchain]\nanchor_version = "0.30.1"\n`;
+    const out = migrateAnchorToml(src);
+    assert(out !== null, 'still changed because seeds = false present');
+    assert(out.includes('anchor_version = "0.30.1"'), 'anchor_version left as-is when already 0.30.1');
+}
+
+// ---------------------------------------------------------------------------
+// TypeScript / JavaScript client migration (T1–T4 + P1–P2)
+// ---------------------------------------------------------------------------
+
+console.log('\nT1 — @project-serum/anchor → @coral-xyz/anchor:');
+{
+    const src = `import * as anchor from "@project-serum/anchor";`;
+    const out = fixProjectSerumImport(src);
+    assert(out.includes('@coral-xyz/anchor'), 'import string replaced');
+    assert(!out.includes('@project-serum/anchor'), 'old package name gone');
+}
+{
+    const src = `const anchor = require("@project-serum/anchor");`;
+    const out = fixProjectSerumImport(src);
+    assert(out.includes('@coral-xyz/anchor'), 'require string replaced');
+}
+{
+    const src = `import { Program } from "@coral-xyz/anchor";`;
+    const out = fixProjectSerumImport(src);
+    assert(out === src, 'already-migrated import unchanged (idempotent)');
+}
+{
+    // Multiple occurrences
+    const src = `import "@project-serum/anchor"; const x = "@project-serum/anchor";`;
+    const out = fixProjectSerumImport(src);
+    assert((out.match(/@coral-xyz\/anchor/g) || []).length === 2, 'both occurrences replaced');
+}
+
+console.log('\nT2 — new Program(idl, programId, provider) → new Program(idl, provider):');
+{
+    // All simple identifiers
+    const src = `const program = new Program(IDL, PROGRAM_ID, provider);`;
+    const out = fixProgramConstructor(src);
+    assert(out.includes('new Program(IDL, provider)'), 'simple 3-arg → 2-arg');
+    assert(!out.includes('PROGRAM_ID'), 'programId removed');
+}
+{
+    // With generic type parameter
+    const src = `const program = new Program<MyProgram>(IDL, programId, provider);`;
+    const out = fixProgramConstructor(src);
+    assert(out.includes('new Program<MyProgram>(IDL, provider)'), 'generic form migrated');
+}
+{
+    // Provider is a nested new expression
+    const src = `const p = new Program(IDL, PROG_ID, new AnchorProvider(conn, wallet, opts));`;
+    const out = fixProgramConstructor(src);
+    assert(out.includes('new Program(IDL, new AnchorProvider(conn, wallet, opts))'), 'nested provider preserved');
+    assert(!out.includes('PROG_ID'), 'programId removed with nested provider');
+}
+{
+    // Already 2-arg form — must not be changed
+    const src = `const program = new Program(IDL, provider);`;
+    const out = fixProgramConstructor(src);
+    assert(out === src, '2-arg form unchanged (idempotent)');
+}
+{
+    // Trailing comma after last arg (TypeScript style) — should still count as 3-arg
+    const src = `this.prog = new Program(\n  LaunchpadIDL,\n  PROGRAM_ID,\n  this.provider,\n);`;
+    const out = fixProgramConstructor(src);
+    assert(out.includes('new Program(LaunchpadIDL, this.provider)'), 'trailing comma form migrated');
+    assert(!out.includes('PROGRAM_ID'), 'programId removed (trailing comma form)');
+}
+{
+    // anchor.Program form is intentionally NOT matched by T2 (dot-prefix namespace)
+    // — left as-is for AI step or manual migration
+    const src = `const p = new anchor.Program(idl, progId, provider);`;
+    const out = fixProgramConstructor(src);
+    assert(out === src, 'anchor.Program (namespaced) left unchanged by T2');
+}
+{
+    // Multiple Program instantiations in one file
+    const src = [
+        'const p1 = new Program(IDL1, PID1, provider);',
+        'const p2 = new Program(IDL2, PID2, provider);',
+    ].join('\n');
+    const out = fixProgramConstructor(src);
+    assert(out.includes('new Program(IDL1, provider)'), 'first instantiation migrated');
+    assert(out.includes('new Program(IDL2, provider)'), 'second instantiation migrated');
+}
+
+console.log('\nT3 — .associated() / .associatedAddress() flagged with TODO:');
+{
+    const src = `const ata = await program.account.myAccount.associated(wallet.publicKey);`;
+    const out = flagAssociatedMethods(src);
+    assert(out.includes('TODO anchor 0.30'), 'TODO comment inserted');
+    assert(out.includes('.associated('), 'method call preserved (not deleted)');
+}
+{
+    const src = `const addr = program.account.mint.associatedAddress(authority);`;
+    const out = flagAssociatedMethods(src);
+    assert(out.includes('TODO anchor 0.30'), 'TODO comment for associatedAddress');
+    assert(out.includes('.associatedAddress('), 'call preserved');
+}
+{
+    // Idempotency: already has TODO comment — no double-annotation
+    const src = `/* TODO anchor 0.30: .associated() removed – use getAssociatedTokenAddressSync() from @solana/spl-token */.associated(`;
+    const out = flagAssociatedMethods(src);
+    const count = (out.match(/TODO anchor 0\.30/g) || []).length;
+    assert(count === 1, 'no duplicate TODO comment on second pass');
+}
+
+console.log('\nT4 — anchor-deprecated-state flagged with TODO:');
+{
+    const src = `features = ["anchor-deprecated-state"]`;
+    const out = flagDeprecatedState(src);
+    assert(out.includes('TODO anchor 0.30'), 'TODO comment inserted');
+    assert(out.includes('anchor-deprecated-state'), 'original text preserved');
+}
+
+console.log('\nmigrateTypeScript — combined T1–T4:');
+{
+    const src = [
+        `import { Program } from "@project-serum/anchor";`,
+        `const program = new Program(IDL, PROGRAM_ID, provider);`,
+        `const ata = await program.account.vault.associated(owner);`,
+    ].join('\n');
+    const out = migrateTypeScript(src);
+    assert(out !== null, 'combined: changes detected');
+    assert(out.includes('@coral-xyz/anchor'), 'T1 applied');
+    assert(out.includes('new Program(IDL, provider)'), 'T2 applied');
+    assert(out.includes('TODO anchor 0.30'), 'T3 applied');
+}
+{
+    // Already fully migrated file → null (idempotent)
+    const src = [
+        `import { Program, AnchorProvider } from "@coral-xyz/anchor";`,
+        `const program = new Program(IDL, provider);`,
+    ].join('\n');
+    const out = migrateTypeScript(src);
+    assert(out === null, 'already-migrated file returns null (idempotent)');
+}
+
+console.log('\nP1/P2 — package.json anchor version + package rename:');
+{
+    // P1: version bump
+    const src = JSON.stringify({ dependencies: { "@coral-xyz/anchor": "^0.29.0" } }, null, 2);
+    const out = migratePackageJson(src);
+    assert(out !== null, 'P1: version changed');
+    assert(out.includes('0.30.1'), 'P1: version bumped to 0.30.1');
+    assert(!out.includes('0.29'), 'P1: old version gone');
+}
+{
+    // P1: tilde prefix
+    const src = JSON.stringify({ devDependencies: { "@coral-xyz/anchor": "~0.29.0" } }, null, 2);
+    const out = migratePackageJson(src);
+    assert(out !== null && out.includes('~0.30.1'), 'P1: tilde version bumped');
+}
+{
+    // P2: package rename (+ P1 bumped too)
+    const src = JSON.stringify({ dependencies: { "@project-serum/anchor": "^0.29.0" } }, null, 2);
+    const out = migratePackageJson(src);
+    assert(out !== null, 'P2: package renamed');
+    assert(out.includes('@coral-xyz/anchor'), 'P2: new package name present');
+    assert(!out.includes('@project-serum/anchor'), 'P2: old package name gone');
+    assert(out.includes('0.30.1'), 'P2+P1: version bumped after rename');
+}
+{
+    // Already on 0.30.x → null (idempotent)
+    const src = JSON.stringify({ dependencies: { "@coral-xyz/anchor": "^0.30.1" } }, null, 2);
+    const out = migratePackageJson(src);
+    assert(out === null, 'P1: already on 0.30.x returns null (idempotent)');
 }
 
 // ---------------------------------------------------------------------------
