@@ -1,6 +1,6 @@
-# anchor-idl-v0-to-v1
+# anchor-idl-v0-to-v1 / v0.29 → v0.30
 
-**Automatically migrate Anchor IDL JSON, Rust source, and TypeScript/JS files from Anchor v0 to v1 format.**
+**Automatically migrate Anchor IDL JSON, Rust source, and TypeScript/JS files from Anchor v0.29 to v0.30 format (IDL v0 → v1 schema + Rust API + TypeScript SDK).**
 
 Version: `0.1.16` | Published on the Codemod registry: [app.codemod.com/registry/anchor-idl-v0-to-v1](https://app.codemod.com/registry/anchor-idl-v0-to-v1)
 
