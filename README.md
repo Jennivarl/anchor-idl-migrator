@@ -4,6 +4,8 @@
 
 Version: `0.1.16` | Published on the Codemod registry: [app.codemod.com/registry/anchor-idl-v0-to-v1](https://app.codemod.com/registry/anchor-idl-v0-to-v1)
 
+Full write-up: [Built a bot that migrates Solana smart contract files automatically](https://medium.com/@varl99911/built-a-bot-that-migrates-solana-smart-contract-files-automatically-dea9415a83a7)
+
 ---
 
 ## What problem does this solve?
