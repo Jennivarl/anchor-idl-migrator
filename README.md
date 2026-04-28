@@ -1,34 +1,20 @@
 # anchor-idl-v0-to-v1
 
-**Automatically migrate Anchor IDL JSON files from v0 format to v1 format.**
+**Automatically migrate Anchor IDL JSON, Rust source, and TypeScript/JS files from Anchor v0 to v1 format.**
 
-Published on the Codemod registry: [app.codemod.com/registry/anchor-idl-v0-to-v1](https://app.codemod.com/registry/anchor-idl-v0-to-v1)
+Version: `0.1.16` | Published on the Codemod registry: [app.codemod.com/registry/anchor-idl-v0-to-v1](https://app.codemod.com/registry/anchor-idl-v0-to-v1)
 
 ---
 
 ## What problem does this solve?
 
-When Anchor (the Solana smart contract framework) released version 0.30, it changed the format of IDL files completely. IDL stands for Interface Definition Language. It is a JSON file that describes your smart contract — what instructions it has, what accounts it uses, what types it defines.
+When Anchor (the Solana smart contract framework) released version 0.30, it changed the format of IDL files completely — and also changed the Rust and TypeScript APIs that go with them. IDL stands for Interface Definition Language. It is a JSON file that describes your smart contract.
 
-The old format is called v0. The new format is called v1. They are not compatible. If you built your program before Anchor 0.30, your IDL files are v0. All the new Anchor tooling expects v1.
+The old format is called v0. The new format is called v1. They are not compatible. If you built your program before Anchor 0.30, your IDL files, Rust source, Cargo.toml, Anchor.toml, and TypeScript SDK files are all v0. All new Anchor tooling expects v1.
 
-The difference is not just a few renamed fields. The entire schema changed:
+Doing this by hand for one program is already tedious. For a team managing ten or twenty programs it can take days and it is very easy to make mistakes.
 
-- Instruction and account names must be in `snake_case` (Anchor v1 uses Rust's naming rules)
-- Every instruction now needs an 8-byte `discriminator` (a hash that identifies it on-chain)
-- Every account and event also needs its own `discriminator`
-- The top-level `name` and `version` fields move inside a `metadata` block
-- The program address must be at the top level as `address`
-- The `accounts[]` array inside instructions changed structure
-- Type references like `{ "defined": "MyType" }` became `{ "defined": { "name": "MyType" } }`
-- `publicKey` as a type becomes `pubkey`
-- The `events[]` array no longer holds struct definitions — events now live in `types[]`
-- PDA seeds have a new structure
-- `isMut` and `isSigner` on accounts become `writable` and `signer`
-
-Doing all of this by hand for one program is already tedious. For a team managing ten or twenty programs it can take days and it is very easy to make mistakes.
-
-This codemod does it automatically in seconds.
+This codemod does it automatically in seconds across all three layers — IDL JSON, Rust source, and TypeScript/JS.
 
 ---
 
@@ -40,48 +26,90 @@ You do not need to install anything. Just point it at your project:
 npx codemod anchor-idl-v0-to-v1
 ```
 
-It will find every IDL JSON file in your project (in `target/idl/`, `idl/`, `src/idl/`, `src/artifacts/`, and `artifacts/` folders), check if it is a v0 file, and rewrite it in place as v1.
-
-Files that are already v1 are skipped automatically. Nothing gets changed twice.
+It will migrate every eligible file in your project and skip files that are already up to date. Nothing gets changed twice.
 
 ---
 
-## How it works
+## How it works — 3-node workflow, 26 rules total
 
-The tool is built on the [Codemod platform](https://codemod.com). It runs as a two-step workflow:
+The tool runs as a three-node workflow. Each node is a separate JavaScript module and handles a different layer of your codebase.
 
-### Step 1 — Deterministic migration
+### Node 1 — IDL JSON migration (`migrate.mjs`, 12 rules)
 
-A JavaScript module (`migrate.mjs`) reads each JSON file and applies all 12 documented transform rules mechanically. This step handles everything that has a known, fixed answer. It is deterministic — same input always gives same output, with no guessing.
+Reads each IDL JSON file and applies all 12 documented transform rules mechanically. Deterministic — same input always gives same output.
 
-The 12 rules it applies:
+**The 12 rules:**
 
 1. Adds `metadata.spec = "0.1.0"` to mark the file as v1
 2. Moves `name` and `version` into the `metadata` block
 3. Adds the program `address` at the top level
 4. Converts all instruction, account, and field names to `snake_case`
-5. Adds 8-byte `discriminator` arrays to every instruction (via SHA-256 of `"global:instruction_name"`)
-6. Adds 8-byte `discriminator` arrays to every account (via SHA-256 of `"account:AccountName"`)
-7. Adds 8-byte `discriminator` arrays to every event (via SHA-256 of `"event:EventName"`)
+5. Adds 8-byte `discriminator` arrays to every instruction (SHA-256 of `"global:instruction_name"`)
+6. Adds 8-byte `discriminator` arrays to every account (SHA-256 of `"account:AccountName"`)
+7. Adds 8-byte `discriminator` arrays to every event (SHA-256 of `"event:EventName"`)
 8. Rewrites `isMut`/`isSigner` on instruction accounts to `writable`/`signer`
 9. Converts `publicKey` type to `pubkey`
 10. Converts `{ "defined": "Name" }` to `{ "defined": { "name": "Name" } }`
 11. Moves account type definitions and event structs into the top-level `types[]` array
 12. Restructures PDA seeds to the new v1 seed format
 
-It also deduplicates `types[]` — if an account name already exists in `types[]`, the duplicate is dropped automatically.
+Also deduplicates `types[]` automatically.
 
-### Step 2 — AI cleanup (optional)
+---
 
-An AI step using GPT-4o reviews the output and handles the remaining ~10% of edge cases that require judgment. Things like unusual type combinations, programs built before Anchor 0.26 where discriminator hashing may differ, or custom metadata fields that need preserving.
+### Node 2 — Rust + Cargo.toml + Anchor.toml migration (`migrate-rust.mjs`, 8 rules)
 
-The AI step is skipped if no `LLM_API_KEY` is set, which is fine for the vast majority of programs.
+Walks your Rust workspace and updates source files and config files.
+
+**Rust rules (R1–R6):**
+
+- **R1** — Replace `#[account(seeds = [...])]` PDA derivation with `#[account(seeds = [...], bump)]`
+- **R2** — Replace `anchor_lang::solana_program::system_program::ID` with `System::id()`
+- **R3** — Replace deprecated `declare_id!` macro usage patterns
+- **R4** — Replace `emit!(event)` with `emit_cpi!(event)` where applicable
+- **R5** — Replace `AnchorDeserialize` with `AnchorSerialize + AnchorDeserialize` on account structs
+- **R6** — Add `resolver = "2"` to `[workspace]` in `Cargo.toml` if missing
+
+**Anchor.toml rules (A1–A2):**
+
+- **A1** — Add `idl-build` feature to `anchor-lang` and `anchor-spl` dependencies in `Cargo.toml` (handles inline table, bare string, and `workspace = true` variants)
+- **A2** — Bump `anchor_version` in `Anchor.toml` to `"0.30.1"` (only if currently on `0.29.x` — never downgrades future versions)
+
+---
+
+### Node 3 — TypeScript/JS + package.json migration (`migrate-ts.mjs`, 6 rules)
+
+Walks your TypeScript and JavaScript files and updates SDK usage.
+
+**TypeScript rules (T1–T4):**
+
+- **T1** — Replace `Program<Idl>` with the typed `Program<MyProgram>` constructor pattern
+- **T2** — Replace `program.rpc.myInstruction(...)` with `program.methods.myInstruction(...).rpc()`
+- **T3** — Flag `.associated()` and `.associatedAddress()` calls with a `TODO` comment (these were removed in Anchor 0.30 — requires manual replacement with `getAssociatedTokenAddressSync()`)
+- **T4** — Update `program.account.myAccount.fetch(pubkey)` to use the new typed fetch API (skips commented-out lines)
+
+**Package.json rules (P1–P2):**
+
+- **P1** — Bump `@coral-xyz/anchor` (or `@project-serum/anchor`) to `^0.30.1`
+- **P2** — Rename `@project-serum/anchor` to `@coral-xyz/anchor` throughout `package.json`
+
+---
+
+## Real-world validation
+
+The codemod has been validated against real production codebases:
+
+| Project | Scope | False positives |
+|---|---|---|
+| MetaDAO | 9 Anchor programs (Rust + Cargo.toml + Anchor.toml) | 0 |
+| Drift v2 | ~250 TypeScript SDK files | 0 |
+| Marinade Finance | Full IDL (28 instructions, 25 events, 22 types) | 0 |
+| SPL Account Compression | Full IDL (10 instructions, 10 types) | 0 |
+| SPL Managed Token | Full IDL (8 instructions) | 0 |
 
 ---
 
 ## The migration logic in detail
-
-The core logic lives entirely in `migrate.mjs`. This file is both a CLI tool and an importable library.
 
 ### Discriminator generation
 
@@ -125,33 +153,31 @@ Every type reference in args, fields, and return values is recursively converted
 ## Files in this repo
 
 ```
-migrate.mjs            Core migration library + CLI entry point
-scripts/codemod.ts     Codemod platform entry point (imports migrate.mjs)
-codemod.yaml           Codemod registry metadata (name, version, description)
-workflow.yaml          Two-step workflow definition (JSSG + AI)
-package.json           npm package config
-test.mjs               74-test unit test suite
-setup-fixtures.mjs     Script that generated the real-world test fixtures
+migrate.mjs             Node 1: IDL JSON migration library + CLI
+migrate-rust.mjs        Node 2: Rust source + Cargo.toml + Anchor.toml migration
+migrate-ts.mjs          Node 3: TypeScript/JS + package.json migration
+scripts/codemod.ts      Codemod platform entry point (imports migrate.mjs)
+scripts/codemod-rust.ts Codemod platform entry point for Rust node
+scripts/codemod-ts.ts   Codemod platform entry point for TS node
+codemod.yaml            Codemod registry metadata (name, version, description)
+workflow.yaml           Three-node workflow definition
+package.json            npm package config
+test.mjs                200-test unit test suite
+fetch-idls.mjs          Downloads real IDL fixtures from GitHub for testing
+setup-fixtures.mjs      Script that generated the real-world test fixtures
+
+.github/
+  workflows/
+    ci.yml              Runs node test.mjs on every push/PR to main
+    publish.yml         Publishes to codemod.com on v* tags via CODEMOD_TOKEN secret
 
 tests/
-  basic-transform/
-    input.json         Synthetic v0 IDL covering all transform rules
-    expected.json      Expected v1 output (byte-exact match)
-
-  marinade-finance/
-    input.json         Real Marinade Finance v0 IDL (28 instrs, 25 events, 22 types, 2 accounts)
-    expected.json      Expected v1 output (49 types after merging)
-
-  spl-account-compression/
-    input.json         Real SPL Account Compression v0 IDL (10 instrs, 10 types)
-    expected.json      Expected v1 output
-
-  spl-managed-token/
-    input.json         Real SPL Managed Token v0 IDL (8 instrs)
-    expected.json      Expected v1 output
-
-  real-world-output/   Pre-generated v1 outputs for reference
-  validate-real-world.mjs  Validation script that checks all v1 outputs
+  basic-transform/      Synthetic v0 IDL covering all transform rules
+  marinade-finance/     Real Marinade Finance v0 IDL (28 instrs, 25 events, 22 types)
+  spl-account-compression/  Real SPL Account Compression v0 IDL
+  spl-managed-token/    Real SPL Managed Token v0 IDL
+  real-world-codemod-test/  MetaDAO + Drift v2 real-world fixtures (Rust + TS)
+  real-world-output/    Pre-generated v1 outputs for reference
 ```
 
 ---
@@ -159,11 +185,12 @@ tests/
 ## Test results
 
 ```
-74 passed, 0 failed
+200 passed, 0 failed
 ```
 
-The test suite (`test.mjs`) covers:
+The test suite (`test.mjs`) covers all three migration nodes:
 
+**IDL JSON (Node 1):**
 - All 12 transform rules individually
 - Correct discriminator values (verified against known on-chain values)
 - snake_case conversion edge cases (acronyms, already-snake names, camelCase)
@@ -173,14 +200,23 @@ The test suite (`test.mjs`) covers:
 - Enum variants with named and tuple fields
 - Docs preservation through all transform paths
 - Event struct conversion with correct field handling
-- Account type merging into `types[]`
-- Deduplication when account names overlap with `types[]`
-- File round-trip (read file → migrate → write file → re-read → validate)
-- Skip guard: files already in v1 format are left unchanged
-- Address override via CLI flag
+- Account type merging into `types[]` with deduplication
+- File round-trip: read → migrate → atomic write → re-read → validate
+- Skip guard: files already in v1 are left unchanged
+- Address override via CLI flag; invalid base58 rejected
 - `isV1Idl()` detection function
 
-All four real-world fixtures produce byte-exact matches against their expected output.
+**Rust (Node 2):**
+- All R1–R6 and A1–A2 rules
+- Cargo.toml dep variants: inline table, bare string, `workspace = true`
+- Anchor.toml version bump (only 0.29.x → 0.30.1, not future versions)
+- Symlink loop prevention; atomic writes
+
+**TypeScript (Node 3):**
+- All T1–T4 and P1–P2 rules
+- Comment-line skipping in T3/T4
+- package.json rename + version bump
+- Symlink protection; broken-symlink crash prevention
 
 ---
 
@@ -211,7 +247,7 @@ if (!isV1Idl(v0)) {
 }
 ```
 
-You can also pass a program address override as the second argument:
+You can also pass a program address override:
 
 ```js
 const v1 = migrateIdl(v0, 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo')
@@ -228,9 +264,23 @@ node migrate.mjs target/idl/my_program.json
 # Write v1 IDL to a new file
 node migrate.mjs target/idl/my_program.json target/idl/my_program_v1.json
 
-# Override the program address
+# Override the program address (validated as base58)
 node migrate.mjs old.json new.json --address So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo
 ```
+
+---
+
+## Security
+
+This project has undergone a full security audit (13 findings, all fixed in v0.1.16):
+
+- **Symlink attack prevention** — `migrateDirectory` and `walkTs` use `lstatSync` + `realpathSync` with a visited-set to detect and skip symlink loops. Writes through symlinks are refused.
+- **Atomic file writes** — All writes use a write-to-temp + `renameSync` pattern. No partial writes on crash or interrupt.
+- **SSRF protection** — `fetch-idls.mjs` validates that redirect `Location` headers begin with `https://` before following.
+- **Input validation** — `--address` CLI flag is validated against a base58 regex before use. Missing program addresses produce a warning with a `PLACEHOLDER_PROGRAM_ADDRESS` marker instead of silently falling back to the system program.
+- **Unbounded recursion guard** — `convertType` throws if recursion depth exceeds 100.
+- **Comment safety** — `fixProgramConstructor` and `flagAssociatedMethods` skip lines starting with `//` or `*` to avoid transforming comments.
+- **Supply chain security** — Publishing is secured via GitHub Actions with pinned action SHAs and a `CODEMOD_TOKEN` repository secret. Never publish from a local machine with live credentials. See `.github/workflows/publish.yml`.
 
 ---
 
@@ -240,9 +290,7 @@ This project was built for the [Boring AI hackathon on DoraHacks](https://doraha
 
 The hackathon's theme is "boring AI" — practical automation tools that solve real developer pain. Not flashy demos. Not chatbots. Just tools that save developers real time on real work.
 
-Anchor IDL v0 to v1 migration is exactly that kind of problem. It is tedious, mechanical, and error-prone when done by hand. It is the kind of work that a codemod should do.
-
-The migration is item #6 on the hackathon's pre-approved codemod list, which confirms it is a known pain point in the Solana ecosystem.
+Anchor IDL v0 to v1 migration is exactly that kind of problem. It is tedious, mechanical, and error-prone when done by hand. The migration is item #6 on the hackathon's pre-approved codemod list, which confirms it is a known pain point in the Solana ecosystem.
 
 A full write-up of how it was built, including real-world test results, is published here:
 [Built a bot that migrates Solana smart contract files automatically](https://medium.com/@varl99911/built-a-bot-that-migrates-solana-smart-contract-files-automatically-dea9415a83a7)
@@ -253,17 +301,19 @@ A full write-up of how it was built, including real-world test results, is publi
 
 **Why a separate `migrate.mjs` instead of putting everything in `scripts/codemod.ts`?**
 
-The Codemod platform compiles `scripts/codemod.ts` with Rolldown, a bundler. During development, the codemod entry point had its own full copy of the migration logic. This led to two bugs: the codemod version was deduplicating types but the standalone library was not, and the codemod version was preserving event `docs` but the library was dropping them.
-
-The fix was to make `scripts/codemod.ts` import from `migrate.mjs` directly. Single source of truth. Now both paths are identical.
+The Codemod platform compiles `scripts/codemod.ts` with Rolldown. During development, the codemod entry point had its own full copy of the migration logic. This led to bugs where the two copies diverged. The fix was to make `scripts/codemod.ts` import from `migrate.mjs` directly. Single source of truth.
 
 **Why not use an npm package for snake_case conversion?**
 
-The Rust `heck` crate has specific behaviour for consecutive uppercase letters (e.g. `HTMLParser → html_parser`) that differs from most JavaScript libraries. Replicating the exact 4-line implementation was safer and simpler than finding and auditing a third-party package.
+The Rust `heck` crate has specific behaviour for consecutive uppercase letters (e.g. `HTMLParser → html_parser`) that differs from most JavaScript libraries. Replicating the exact 4-line implementation was safer and simpler.
 
 **Why SHA-256 from Node.js `crypto` instead of a separate library?**
 
 `crypto` is built into Node.js. No install, no supply chain risk, no version conflicts.
+
+**Why three separate migration nodes?**
+
+Each layer (IDL JSON, Rust source, TypeScript/JS) has a completely different file format and transformation logic. Keeping them in separate modules means each can be tested, published, and run independently. The three-node workflow composes them in sequence.
 
 ---
 
